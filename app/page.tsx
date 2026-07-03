@@ -1,8 +1,23 @@
 "use client";
 
-import { useState, useEffect, type FormEvent } from "react";
+import { useState, useEffect, useRef, type FormEvent } from "react";
 import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport, type UIMessage, type ModelMessage } from "ai";
+import {
+  Send,
+  Square,
+  Trash2,
+  Plus,
+  AlertCircle,
+  Bot,
+  User,
+} from "lucide-react";
+
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { cn } from "@/lib/utils";
 
 const THREAD_KEY = "chat:threadId";
 
@@ -27,6 +42,7 @@ export default function ChatPage() {
   const [threadId, setThreadId] = useState<string>("");
   const [storeKind, setStoreKind] = useState<"redis" | "memory" | null>(null);
   const [hydrated, setHydrated] = useState(false);
+  const scrollRef = useRef<HTMLDivElement>(null);
 
   // 客户端水合后生成/读取 threadId
   useEffect(() => {
@@ -36,7 +52,7 @@ export default function ChatPage() {
 
   // useChat 封装流式请求、消息管理
   const { messages, sendMessage, stop, status, setMessages, error } = useChat({
-    id: threadId, // 切换 threadId 时 useChat 会自动重置
+    id: threadId,
     transport: new DefaultChatTransport({
       api: "/api/chat",
       body: () => ({ threadId }),
@@ -57,7 +73,6 @@ export default function ChatPage() {
         };
         if (cancelled) return;
         setStoreKind(data.kind);
-        // 把 ModelMessage[] 还原为 UIMessage 形态（加 id）
         const uiMsgs: UIMessage[] = (data.messages ?? []).map(
           (m, i): UIMessage => {
             const text = Array.isArray(m.content)
@@ -82,6 +97,12 @@ export default function ChatPage() {
     };
   }, [threadId, setMessages]);
 
+  // 自动滚动到底部
+  useEffect(() => {
+    if (!scrollRef.current) return;
+    scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+  }, [messages]);
+
   const isStreaming = status === "submitted" || status === "streaming";
 
   const onSubmit = (e: FormEvent) => {
@@ -97,7 +118,6 @@ export default function ChatPage() {
     const id = newThreadId();
     setThreadId(id);
     setMessages([]);
-    // 可选：异步清服务端记录
     if (oldId) {
       fetch(`/api/sessions/${oldId}`, { method: "DELETE" }).catch(() => {});
     }
@@ -110,99 +130,188 @@ export default function ChatPage() {
   };
 
   return (
-    <main className="max-w-3xl mx-auto p-4 min-h-screen flex flex-col">
-      <div className="flex items-center justify-between py-4">
-        <h1 className="text-2xl font-bold">AI聊天助手(Next.js+千问)</h1>
-        <div className="text-xs text-gray-400">
-          {hydrated && threadId && (
-            <>
-              <span>会话: {threadId.slice(0, 8)}…</span>
-              {storeKind && (
-                <span className="ml-2 px-1.5 py-0.5 rounded bg-gray-100">
-                  {storeKind === "redis" ? "Redis" : "内存"}
-                </span>
-              )}
-            </>
-          )}
-        </div>
-      </div>
-
-      {error && (
-        <div className="bg-red-100 text-red-700 p-2 rounded mb-2">
-          出错了：{error.message}
-        </div>
-      )}
-
-      {/* 消息对话区域 */}
-      <div className="flex-1 overflow-auto space-y-4 py-4">
-        {messages.map((msg) => (
-          <div
-            key={msg.id}
-            className={`p-3 rounded-lg ${
-              msg.role === "user"
-                ? "bg-blue-100 text-right ml-auto max-w-[80%]"
-                : "bg-gray-100 text-left mr-auto max-w-[80%]"
-            }`}
-          >
-            {msg.parts.map((part, i) =>
-              part.type === "text" ? (
-                <p
-                  key={i}
-                  className="whitespace-pre-wrap"
-                >
-                  {part.text}
+    <main className="min-h-screen bg-gradient-to-b from-background to-muted/30 flex flex-col">
+      <div className="container max-w-4xl mx-auto py-6 px-4 flex-1 flex flex-col">
+        <Card className="flex-1 flex flex-col overflow-hidden">
+          {/* Header */}
+          <CardHeader className="border-b bg-muted/30 flex-row items-center justify-between space-y-0 py-4">
+            <div className="flex items-center gap-2">
+              <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary text-primary-foreground">
+                <Bot className="h-5 w-5" />
+              </div>
+              <div>
+                <CardTitle className="text-lg">AI 聊天助手</CardTitle>
+                <p className="text-xs text-muted-foreground">
+                  Next.js · 千问 / OpenAI 兼容接口
                 </p>
-              ) : null,
-            )}
-          </div>
-        ))}
-        {isStreaming && (
-          <div className="text-gray-400 text-sm">AI 正在思考…</div>
-        )}
-      </div>
+              </div>
+            </div>
 
-      {/* 输入区域 */}
-      <form
-        onSubmit={onSubmit}
-        className="flex gap-2 mt-4"
-      >
-        <input
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          placeholder="输入你的问题..."
-          className="flex-1 border rounded px-3 py-2 outline-none focus:border-blue-400"
-        />
-        <button
-          type="submit"
-          disabled={isStreaming || !input.trim() || !threadId}
-          className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 disabled:opacity-50"
-        >
-          发送
-        </button>
-        {isStreaming && (
-          <button
-            type="button"
-            onClick={stop}
-            className="bg-yellow-500 text-white px-4 py-2 rounded hover:bg-yellow-600"
+            {hydrated && threadId && (
+              <div className="flex items-center gap-2 text-xs">
+                <span className="text-muted-foreground font-mono">
+                  {threadId.slice(0, 8)}…
+                </span>
+                {storeKind && (
+                  <Badge
+                    variant={storeKind === "redis" ? "success" : "secondary"}
+                    className="font-normal"
+                  >
+                    {storeKind === "redis" ? "Redis" : "内存"}
+                  </Badge>
+                )}
+              </div>
+            )}
+          </CardHeader>
+
+          {/* Messages */}
+          <CardContent
+            ref={scrollRef}
+            className="flex-1 overflow-y-auto scroll-area p-4 space-y-4"
           >
-            停止
-          </button>
-        )}
-        <button
-          type="button"
-          onClick={onClearCurrent}
-          className="bg-gray-400 text-white px-4 py-2 rounded hover:bg-gray-500"
-        >
-          清空
-        </button>
-        <button
-          type="button"
-          onClick={onNewChat}
-          className="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600"
-        >
-          新会话
-        </button>
-      </form>
+            {messages.length === 0 && (
+              <div className="h-full flex items-center justify-center text-center text-muted-foreground py-16">
+                <div>
+                  <Bot className="h-12 w-12 mx-auto mb-3 opacity-30" />
+                  <p className="text-sm">开始一个对话吧</p>
+                </div>
+              </div>
+            )}
+
+            {messages.map((msg) => {
+              const isUser = msg.role === "user";
+              const text = msg.parts
+                .map((p) => (p.type === "text" ? p.text : ""))
+                .join("");
+              const isLastAssistant =
+                !isUser && msg === messages[messages.length - 1] && isStreaming;
+              return (
+                <div
+                  key={msg.id}
+                  className={cn(
+                    "flex gap-3 max-w-[85%]",
+                    isUser ? "ml-auto flex-row-reverse" : "mr-auto",
+                  )}
+                >
+                  <div
+                    className={cn(
+                      "flex h-8 w-8 shrink-0 items-center justify-center rounded-full",
+                      isUser
+                        ? "bg-blue-500 text-white"
+                        : "bg-primary text-primary-foreground",
+                    )}
+                  >
+                    {isUser ? (
+                      <User className="h-4 w-4" />
+                    ) : (
+                      <Bot className="h-4 w-4" />
+                    )}
+                  </div>
+                  <div
+                    className={cn(
+                      "rounded-2xl px-4 py-2.5 shadow-sm",
+                      isUser
+                        ? "bg-blue-500 text-white"
+                        : "bg-muted text-foreground",
+                    )}
+                  >
+                    <p className="whitespace-pre-wrap text-sm leading-relaxed">
+                      {text}
+                      {isLastAssistant && (
+                        <span className="inline-block w-1.5 h-4 bg-current align-middle ml-1 cursor-blink" />
+                      )}
+                    </p>
+                  </div>
+                </div>
+              );
+            })}
+
+            {isStreaming && messages[messages.length - 1]?.role === "user" && (
+              <div className="flex gap-3 mr-auto max-w-[85%]">
+                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground">
+                  <Bot className="h-4 w-4" />
+                </div>
+                <div className="rounded-2xl px-4 py-2.5 bg-muted">
+                  <div className="flex gap-1">
+                    <span className="h-2 w-2 rounded-full bg-muted-foreground/60 animate-bounce [animation-delay:-0.3s]" />
+                    <span className="h-2 w-2 rounded-full bg-muted-foreground/60 animate-bounce [animation-delay:-0.15s]" />
+                    <span className="h-2 w-2 rounded-full bg-muted-foreground/60 animate-bounce" />
+                  </div>
+                </div>
+              </div>
+            )}
+          </CardContent>
+
+          {/* Error */}
+          {error && (
+            <div className="mx-4 mb-2 flex items-start gap-2 rounded-md border border-destructive/50 bg-destructive/10 p-3 text-sm text-destructive">
+              <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" />
+              <span>{error.message}</span>
+            </div>
+          )}
+
+          {/* Input */}
+          <div className="border-t bg-muted/30 p-4">
+            <form
+              onSubmit={onSubmit}
+              className="flex items-center gap-2"
+            >
+              <Input
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                placeholder="输入你的问题，回车发送…"
+                className="flex-1 h-10 bg-background"
+                disabled={isStreaming}
+              />
+              {isStreaming ? (
+                <Button
+                  type="button"
+                  variant="destructive"
+                  size="icon"
+                  onClick={stop}
+                  aria-label="停止"
+                >
+                  <Square className="h-4 w-4 fill-current" />
+                </Button>
+              ) : (
+                <Button
+                  type="submit"
+                  size="icon"
+                  disabled={!input.trim() || !threadId}
+                  aria-label="发送"
+                >
+                  <Send className="h-4 w-4" />
+                </Button>
+              )}
+              <Button
+                type="button"
+                variant="outline"
+                size="icon"
+                onClick={onClearCurrent}
+                disabled={!threadId}
+                aria-label="清空当前对话"
+                title="清空当前对话"
+              >
+                <Trash2 className="h-4 w-4" />
+              </Button>
+              <Button
+                type="button"
+                variant="secondary"
+                size="icon"
+                onClick={onNewChat}
+                aria-label="新会话"
+                title="新会话"
+              >
+                <Plus className="h-4 w-4" />
+              </Button>
+            </form>
+          </div>
+        </Card>
+
+        <p className="text-center text-xs text-muted-foreground mt-3">
+          Powered by Next.js + AI SDK · 历史 24h 后过期
+        </p>
+      </div>
     </main>
   );
 }
