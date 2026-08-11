@@ -1,0 +1,19 @@
+# 本地开发用的 Redis。
+# 启动:docker compose up -d
+# 停止:docker compose down
+# 数据卷 redis-data 持久化 AOF;down 时不会丢。
+# 对应 .env / .env.local 中:REDIS_URL=redis://localhost:6379
+
+services:
+  redis:
+    image: redis:7-alpine
+    container_name: ai-chat-assistant-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redis-data:/data
+
+volumes:
+  redis-data:

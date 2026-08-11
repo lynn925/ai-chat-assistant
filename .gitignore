@@ -34,6 +34,11 @@ yarn-error.log*
 .env*
 !.env.example
 
+# user-uploaded files (Vercel 是只读 fs,生产环境也写不了,这里忽略 git)
+public/uploads/
+# 兼容旧位置
+/uploads/
+
 # IDE / agent local state
 .trae/
 

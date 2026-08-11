@@ -110,12 +110,23 @@
 }
 
 /* 聊天滚动条样式 */
+.scroll-area {
+  /* Firefox */
+  scrollbar-width: thin;
+  scrollbar-color: var(--muted-foreground) transparent;
+}
 .scroll-area::-webkit-scrollbar {
-  width: 6px;
+  width: 8px;
 }
 .scroll-area::-webkit-scrollbar-thumb {
-  background: var(--border);
-  border-radius: 3px;
+  background: var(--muted-foreground);
+  border-radius: 4px;
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+.scroll-area::-webkit-scrollbar-thumb:hover {
+  background: var(--foreground);
+  background-clip: content-box;
 }
 .scroll-area::-webkit-scrollbar-track {
   background: transparent;
